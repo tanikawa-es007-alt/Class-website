@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小学生向けクイズアプリ</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background-color: #f0f9ff;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="max-w-xl w-full bg-white rounded-3xl shadow-2xl p-6 sm:p-8 border-4 border-sky-300">
+        
+        <!-- Header / Title -->
+        <div class="text-center mb-6">
+            <h1 class="text-2xl sm:text-3xl font-bold text-sky-600 mb-2">✨ たのしいクイズ大会 ✨</h1>
+            <p class="text-green-600 text-lg">都道府県のせい品クイズ！　何ポイントゲットできるかな？</p>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="text-center py-8">
+            <div class="mb-6 text-6xl">🌟</div>
+            <p class="text-lg text-gray-700 mb-6 leading-relaxed">
+                ぜんぶで7もんのクイズがあるよ。<br>
+                せいかいすると 10ポイントゲット！<br>
+                ぜん問正解をめざしてがんばろう！
+            </p>
+            <button onclick="playSound('action'); startQuiz()" class="bg-amber-400 hover:bg-amber-500 text-gray-800 font-bold text-xl px-8 py-4 rounded-full shadow-lg transform transition hover:scale-105 active:scale-95">
+                クイズをはじめる！
+            </button>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="hidden">
+            <!-- Progress & Score Bar -->
+            <div class="flex justify-between items-center mb-4 bg-sky-50 p-3 rounded-xl border border-sky-200">
+                <span id="question-number" class="text-lg font-bold text-sky-700">もんだい 1 / 7</span>
+                <span id="current-score" class="text-lg font-bold text-amber-600">ポイント: 0点</span>
+            </div>
+
+            <!-- Question Image -->
+            <div class="mb-4 overflow-hidden rounded-2xl shadow-md h-40 bg-sky-100 flex items-center justify-center">
+                <img id="question-image" src="" alt="もんだいのしゃしん" class="w-100 h-40 object-cover" onerror="this.src='https://placehold.co/600x400/e0f2fe/0284c7?text=Quiz+Image'">
+            </div>
+
+            <!-- Question Text -->
+            <h2 id="question-text" class="text-xl sm:text-xl font-bold text-gray-800 mb-4 leading-relaxed">
+                <!-- Question loaded via JS -->
+            </h2>
+
+            <!-- Options Container: Horizontal Row (3 Columns) -->
+            <div id="options-container" class="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+                <!-- Options buttons loaded dynamically via JS -->
+            </div>
+
+            <!-- Feedback Area (Hidden initially) -->
+            <div id="feedback-area" class="hidden p-4 rounded-2xl mb-3 text-center">
+                <h3 id="feedback-title" class="text-2xl font-bold mb-2"></h3>
+                <p id="feedback-explanation" class="text-gray-700 text-lg leading-relaxed"></p>
+            </div>
+
+            <!-- Next Button (Hidden initially) -->
+            <button id="next-button" onclick="playSound('action'); nextQuestion()" class="hidden w-full bg-sky-500 hover:bg-sky-600 text-white font-bold text-lg py-3 rounded-2xl shadow-md transition transform hover:scale-[1.01]">
+                つぎのもんだいへすすむ
+            </button>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result-screen" class="hidden text-center py-6">
+           <div class="text-6xl mb-4">🏆</div>
+            <h2 class="text-2xl sm:text-3xl font-bold text-sky-700 mb-4">おつかれさまでした！</h2>
+            <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 mb-6">
+                <p class="text-gray-600 text-xl mb-2">あなたのけっか</p>
+                <p id="final-score" class="text-4xl sm:text-5xl font-extrabold text-amber-600 mb-2">70 / 70 点</p>
+                <p id="encouragement-message" class="text-gray-700 text-lg font-medium"></p>
+            </div>
+             <button onclick="playSound('action'); restartQuiz()" class="bg-amber-400 hover:bg-amber-500 text-gray-800 font-bold text-lg px-8 py-3 rounded-full shadow-lg transition transform hover:scale-105">
+                もういちどちょうせんする
+            </button>
+            <button onclick="playSound('finish'); finishQuiz()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-lg px-8 py-3 rounded-full shadow-lg transition transform hover:scale-105 mt-3 sm:mt-0 sm:ml-2">
+                クイズをおわる
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Sound effect settings suitable for 3rd graders
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            try {
+                initAudio();
+                const now = audioCtx.currentTime;
+
+                if (type === 'option') {
+                    // Answer button click: Fun short pop sound
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'action') {
+                    // Start, Next, Restart buttons: Exciting chime
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+                    osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'finish') {
+                    // "End Quiz" button: Cheerful happy jingle
+                    const notes = [523.25, 587.33, 659.25, 698.46, 783.99];
+                    notes.forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                        gain.gain.setValueAtTime(0.15, now + idx * 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.08 + 0.15);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.08);
+                        osc.stop(now + idx * 0.08 + 0.15);
+                    });
+                } else if (type === 'correct') {
+                    // Correct answer: Power charging up sound (ascending arpeggio + chime)
+                    const frequencies = [300, 450, 600, 750, 950];
+                    frequencies.forEach((f, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(f, now + idx * 0.06);
+                        gain.gain.setValueAtTime(0.2, now + idx * 0.06);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.06 + 0.15);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.06);
+                        osc.stop(now + idx * 0.06 + 0.15);
+                    });
+                } else if (type === 'incorrect') {
+                    // Incorrect answer: Dropping mood sound
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(250, now);
+                    osc.frequency.linearRampToValueAtTime(130, now + 0.3);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'applause') {
+                    // Result: High score applause / celebratory chime fanfar
+                    const chord = [523.25, 659.25, 783.99, 1046.50];
+                    chord.forEach((freq) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, now);
+                        gain.gain.setValueAtTime(0.15, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now);
+                        osc.stop(now + 0.6);
+                    });
+                } else if (type === 'sad_result') {
+                    // Result: Low score disappointment sound
+                    const notes = [350, 310, 260];
+                    notes.forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.2);
+                        gain.gain.setValueAtTime(0.15, now + idx * 0.2);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.2 + 0.25);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.2);
+                        osc.stop(now + idx * 0.2 + 0.25);
+                    });
+                }
+            } catch (e) {
+                console.log("Audio playback error:", e);
+            }
+        }
+
+        // Quiz Data in JSON format tailored for 3rd graders
+        const quizData = [
+            {
+                question: "日本で１番、「タオル」の生産量が多い都道府県はどこ？\n ヒント：四国地方にあります。",
+                image: "https://tsukatte.com/wp-content/uploads/2020/06/towel.png?auto=format&fit=crop&w=600&q=80",
+                options: ["ア．愛媛県", "イ．大阪府", "ウ．岡山県"],
+                answer: 0,
+                explanation: "正解は、アの愛媛県。今治市（いまばりし）ではタオルの生産がさかんです。"
+            },
+            {
+                question: "日本で１番、「陶磁器（とうじき）」の生産量が多い都道府県はどこ？\n ヒント：中部地方にあり、海に面していないです。",
+                image: "https://japaclip.com/files/rice-bowl-ochawan.png?auto=format&fit=crop&w=600&q=80",
+                options: ["ア．山口県", "イ．京都府", "ウ．岐阜県"],
+                answer: 2,
+                explanation: "正解は、ウの岐阜県。美濃焼（みのやき）とよばれる焼きものづくりがさかんです。"
+            },
+            {
+                question: "日本で１番、「メガネフレーム」の生産量が多い都道府県はどこ？\n ヒント：日本海側にある都道府県です。",
+                image: "https://tsukatte.com/wp-content/uploads/2021/06/glasses_yellow.png?auto=format&fit=crop&w=600&q=80",
+                options: ["ア．福井県", "イ．兵庫県", "ウ．三重県"],
+                answer: 0,
+                explanation: "正解は、アの福井県。鯖江市（さばえし）はメガネフレームの生産量が日本一です。"
+            },
+            {
+                question: "日本で１番、「節句人形（せっくにんぎょう）や雛人形（ひなにんぎょう）」の生産量が多い都道府県はどこ？\n ヒント：海に面していない都道府県です。",
+                image: "https://freeillust-classic.com/wp-content/uploads/2020/02/0220000015.png?auto=format&fit=crop&w=600&q=80",
+                options: ["ア．東京都", "イ．埼玉県", "ウ．千葉県"],
+                answer: 1,
+                explanation: "正解は、イの埼玉県。さいたま市岩槻区（いわつきく）は雛（ひな）人形生産量が日本一です。"
+            },
+            {
+                question: "日本で１番、「普通自動車（ふつうじどうしゃ）」の生産量が多い都道府県はどこ？\n ヒント：中部地方にあり、太平洋に面している都道府県です。",
+                image: "https://sakutto-sozai.com/wp-content/uploads/2021/03/kei-car_001.png?auto=format&fit=crop&w=600&q=80",
+                options: ["ア．三重県", "イ．愛知県", "ウ．静岡県"],
+                answer: 1,
+                explanation: "正解は、イの愛知県。豊田市（とよたし）には、自動車工場がたくさんあります。"
+            },
+            {
+                question: "日本で１番、真珠（しんじゅ）のネックレスや指輪（ゆびわ）などの生産量が多い都道府県はどこ？\n ヒント：近畿（きんき）地方にあり、太平洋に面している都道府県です。",
+                image: "https://season-calendar.com/wp-content/uploads/2018/05/shinju-necklace.png?auto=format&fit=crop&w=600&q=80",
+                options: ["ア．三重県", "イ．和歌山県", "ウ．静岡県"],
+                answer: 0,
+                explanation: "正解は、アの三重県。養（よう）しょく真珠（しんじゅ）の生産量はさかんです。"
+            },
+            {
+                question: "日本で１番、ナイフ・フォーク・スプーンなどの生産量が多い都道府県はどこ？\n ヒント：日本海に面している都道府県です。",
+                image: "https://photo-step.co.jp/illustkobo/wp-content/uploads/2019/06/0148_R_450.png?auto=format&fit=crop&w=600&q=80",
+                options: ["ア．石川県", "イ．富山県", "ウ．新潟県"],
+                answer: 2,
+                explanation: "正解は、ウの新潟県。日本の生産量全体のおよそ９０パーセントをつくっています。"
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let isAnswered = false;
+
+        // Start Quiz Function
+        function startQuiz() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            currentQuestionIndex = 0;
+            score = 0;
+            loadQuestion();
+        }
+
+        // Load Question Function
+        function loadQuestion() {
+            isAnswered = false;
+            const q = quizData[currentQuestionIndex];
+
+            document.getElementById('start-screen').classList.add('hidden');
+            // Update Progress
+            document.getElementById('question-number').innerText = `もんだい ${currentQuestionIndex + 1} / ${quizData.length}`;
+            document.getElementById('current-score').innerText = `ポイント: ${score}点`;
+
+            // Update Image
+            document.getElementById('question-image').src = q.image;
+
+            // Update Question Text
+            document.getElementById('question-text').innerText = q.question;
+
+            // Render Options in 3 horizontal buttons
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+
+            q.options.forEach((option, index) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-center bg-sky-50 hover:bg-sky-100 border-2 border-sky-300 text-gray-800 font-bold text-lg p-3 sm:p-4 rounded-xl transition transform active:scale-95 flex items-center justify-center min-h-[60px]";
+                btn.innerText = option;
+                btn.onclick = () => {
+                    playSound('option');
+                    selectAnswer(index);
+                };
+                container.appendChild(btn);
+            });
+
+            // Hide Feedback & Next Button
+            document.getElementById('feedback-area').classList.add('hidden');
+            document.getElementById('next-button').classList.add('hidden');
+        }
+
+        // Select Answer Function
+        function selectAnswer(selectedIndex) {
+            if (isAnswered) return;
+            isAnswered = true;
+
+            const q = quizData[currentQuestionIndex];
+            const feedbackArea = document.getElementById('feedback-area');
+            const feedbackTitle = document.getElementById('feedback-title');
+            const feedbackExplanation = document.getElementById('feedback-explanation');
+            const nextButton = document.getElementById('next-button');
+
+            // Disable further clicks on options
+            const optionButtons = document.getElementById('options-container').getElementsByTagName('button');
+            for (let i = 0; i < optionButtons.length; i++) {
+                optionButtons[i].disabled = true;
+                if (i === q.answer) {
+                    optionButtons[i].classList.remove('bg-sky-50', 'border-sky-200');
+                    optionButtons[i].classList.add('bg-emerald-100', 'border-emerald-500', 'text-emerald-900');
+                } else if (i === selectedIndex && selectedIndex !== q.answer) {
+                    optionButtons[i].classList.remove('bg-sky-50', 'border-sky-200');
+                    optionButtons[i].classList.add('bg-rose-100', 'border-rose-400', 'text-rose-900');
+                }
+            }
+
+            feedbackArea.classList.remove('hidden');
+
+            if (selectedIndex === q.answer) {
+                score += 10;
+                document.getElementById('current-score').innerText = `ポイント: ${score}点`;
+                feedbackArea.className = "p-4 rounded-2xl mb-4 bg-emerald-50 border-2 border-emerald-300 text-center";
+                feedbackTitle.innerHTML = "⭕ みごと せいかい！ (+10点)";
+                feedbackTitle.className = "text-2xl font-bold mb-2 text-emerald-700";
+                playSound('correct');
+            } else {
+                feedbackArea.className = "p-4 rounded-2xl mb-4 bg-rose-50 border-2 border-rose-300 text-center";
+                feedbackTitle.innerHTML = "❌ ざんねん！ 不正解…";
+                feedbackTitle.className = "text-2xl font-bold mb-2 text-rose-700";
+                playSound('incorrect');
+            }
+
+            feedbackExplanation.innerText = q.explanation;
+            nextButton.classList.remove('hidden');
+        }
+
+        // Next Question or Finish
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < quizData.length) {
+                loadQuestion();
+            } else {
+                showResult();
+            }
+        }
+
+        // Show Result Screen
+        function showResult() {
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+
+            const maxScore = quizData.length * 10;
+            document.getElementById('final-score').innerText = `${score} / ${maxScore} 点`;
+
+            const msgElement = document.getElementById('encouragement-message');
+            if (score >= maxScore * 0.7) {
+                msgElement.innerText = score === maxScore ? "すごすぎる！全問正解おめでとう！君は「クイズはかせ」だね！" : "よくがんばったね！すばらしい成績だよ！";
+                playSound('applause');
+            } else {
+                msgElement.innerText = "よくちょうせんしたね！もういちどプレイして、もっと高い点数をめざそう！";
+                playSound('sad_result');
+            }
+        }
+
+        // Restart Quiz
+        function restartQuiz() {
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+        }
+        // Finish Quiz
+        function finishQuiz() {
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('app').innerHTML = `
+                <div class="text-center py-12">
+                    <div class="text-6xl mb-4">👋</div>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-sky-700 mb-4">おつかれさまでした！</h2>
+                    <p class="text-gray-700 text-lg">またクイズであそびにきてね！</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
